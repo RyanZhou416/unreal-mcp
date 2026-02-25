@@ -17,6 +17,7 @@ build/
 dist/
 wheels/
 *.egg-info
+.pytest_cache/
 
 # Virtual environments
 .venv
@@ -160,3 +161,8 @@ Backup/
 #
 UNREAL/Source/
 UNREAL/SOURCE/
+
+# UE5 test project - only track .uproject, Config, and plugin source
+UE5/MCPHost/.vsconfig
+UE5/MCPHost/*.sln
+UE5/MCPHost/Source/

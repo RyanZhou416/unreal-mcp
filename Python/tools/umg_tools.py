@@ -11,7 +11,7 @@ from mcp.server.fastmcp import FastMCP, Context
 # Get logger
 logger = logging.getLogger("UnrealMCP")
 
-def register_umg_tools(mcp: FastMCP):
+def register_umg_tools(mcp: FastMCP, config=None):
     """Register UMG tools with the MCP server."""
 
     @mcp.tool()

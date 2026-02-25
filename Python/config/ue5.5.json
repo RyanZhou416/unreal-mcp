@@ -1,0 +1,35 @@
+{
+  "engine_version": "5.5",
+
+  "features": {
+    "enhanced_input": true,
+    "umg_editor": true,
+    "blueprint_editor_library": true,
+    "focus_viewport": false,
+    "take_screenshot": true,
+    "physics_properties": true,
+    "widget_blueprint": true,
+    "input_mapping": true,
+    "blueprint_nodes": true,
+    "blueprint_variables": true,
+    "component_reference": true,
+    "self_reference": true
+  },
+
+  "supported_components": [
+    "StaticMeshComponent",
+    "BoxCollisionComponent",
+    "SphereCollisionComponent",
+    "CameraComponent",
+    "SpringArmComponent",
+    "PointLightComponent",
+    "SpotLightComponent",
+    "FloatingPawnMovement",
+    "SceneComponent",
+    "ArrowComponent"
+  ],
+
+  "api_compatibility": {
+    "iwyu_mode": "IWYUSupport.Full"
+  }
+}

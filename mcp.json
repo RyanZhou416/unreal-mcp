@@ -8,6 +8,50 @@
         "run",
         "unreal_mcp_server.py"
       ]
+    },
+    "unrealMCP-5.7": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "absolute/path/to/this/repository/Python",
+        "run",
+        "unreal_mcp_server.py",
+        "--ue-version",
+        "5.7"
+      ]
+    },
+    "unrealMCP-5.5": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "absolute/path/to/this/repository/Python",
+        "run",
+        "unreal_mcp_server.py",
+        "--ue-version",
+        "5.5"
+      ]
+    },
+    "unrealMCP-5.4": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "absolute/path/to/this/repository/Python",
+        "run",
+        "unreal_mcp_server.py",
+        "--ue-version",
+        "5.4"
+      ]
+    },
+    "unrealMCP-5.3": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "absolute/path/to/this/repository/Python",
+        "run",
+        "unreal_mcp_server.py",
+        "--ue-version",
+        "5.3"
+      ]
     }
   }
 }

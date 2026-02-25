@@ -1,0 +1,83 @@
+{
+  "engine_version": "5.5",
+  "plugin_version": "0.1.0",
+
+  "connection": {
+    "host": "127.0.0.1",
+    "port": 55557,
+    "timeout": 5,
+    "recv_buffer_size": 4096,
+    "socket_recv_buffer": 65536,
+    "socket_send_buffer": 65536
+  },
+
+  "features": {
+    "enhanced_input": true,
+    "umg_editor": true,
+    "blueprint_editor_library": true,
+    "focus_viewport": false,
+    "take_screenshot": true,
+    "physics_properties": true,
+    "pawn_properties": false,
+    "widget_blueprint": true,
+    "input_mapping": true,
+    "blueprint_nodes": true,
+    "blueprint_variables": true,
+    "component_reference": true,
+    "self_reference": true
+  },
+
+  "supported_actor_types": [
+    "StaticMeshActor",
+    "PointLight",
+    "SpotLight",
+    "DirectionalLight",
+    "CameraActor"
+  ],
+
+  "supported_components": [
+    "StaticMeshComponent",
+    "BoxCollisionComponent",
+    "SphereCollisionComponent",
+    "CameraComponent",
+    "SpringArmComponent",
+    "PointLightComponent",
+    "SpotLightComponent",
+    "FloatingPawnMovement",
+    "SceneComponent",
+    "ArrowComponent"
+  ],
+
+  "supported_parent_classes": [
+    "Actor",
+    "Pawn",
+    "Character",
+    "GameModeBase",
+    "PlayerController"
+  ],
+
+  "blueprint_events": [
+    "BeginPlay",
+    "Tick",
+    "EndPlay",
+    "ActorBeginOverlap",
+    "ActorEndOverlap"
+  ],
+
+  "umg_widget_types": [
+    "TextBlock",
+    "Button"
+  ],
+
+  "api_compatibility": {
+    "iwyu_mode": "IWYUSupport.Full",
+    "deprecated_commands": {
+      "create_actor": "spawn_actor"
+    }
+  },
+
+  "logging": {
+    "level": "DEBUG",
+    "file": "unreal_mcp.log"
+  }
+}

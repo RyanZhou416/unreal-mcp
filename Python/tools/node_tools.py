@@ -11,7 +11,7 @@ from mcp.server.fastmcp import FastMCP, Context
 # Get logger
 logger = logging.getLogger("UnrealMCP")
 
-def register_blueprint_node_tools(mcp: FastMCP):
+def register_blueprint_node_tools(mcp: FastMCP, config=None):
     """Register Blueprint node manipulation tools with the MCP server."""
     
     @mcp.tool()

@@ -2,30 +2,39 @@
 Unreal Engine MCP Server
 
 A simple MCP server for interacting with Unreal Engine.
+Supports multiple Unreal Engine versions via the version config system.
 """
 
+import argparse
 import logging
 import socket
 import sys
 import json
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Dict, Any, Optional
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP, Context
+
+from version_config import VersionConfig, get_config, init_config
+
+# Parse command-line args early so logging can use the config
+_parser = argparse.ArgumentParser(add_help=False)
+_parser.add_argument("--ue-version", default="", help="Target Unreal Engine version (e.g. 5.3, 5.4, 5.5)")
+_known_args, _ = _parser.parse_known_args()
+
+# Initialise version config (CLI arg > env var > default)
+_version_config = init_config(_known_args.ue_version)
 
 # Configure logging with more detailed format
 logging.basicConfig(
-    level=logging.DEBUG,  # Change to DEBUG level for more details
+    level=getattr(logging, _version_config.log_level, logging.DEBUG),
     format='%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
     handlers=[
-        logging.FileHandler('unreal_mcp.log'),
-        # logging.StreamHandler(sys.stdout) # Remove this handler to unexpected non-whitespace characters in JSON
+        logging.FileHandler(_version_config.log_file),
     ]
 )
 logger = logging.getLogger("UnrealMCP")
-
-# Configuration
-UNREAL_HOST = "127.0.0.1"
-UNREAL_PORT = 55557
+logger.info(_version_config.summary())
 
 class UnrealConnection:
     """Connection to an Unreal Engine instance."""
@@ -34,11 +43,11 @@ class UnrealConnection:
         """Initialize the connection."""
         self.socket = None
         self.connected = False
+        self.config = get_config()
     
     def connect(self) -> bool:
         """Connect to the Unreal Engine instance."""
         try:
-            # Close any existing socket
             if self.socket:
                 try:
                     self.socket.close()
@@ -46,19 +55,23 @@ class UnrealConnection:
                     pass
                 self.socket = None
             
-            logger.info(f"Connecting to Unreal at {UNREAL_HOST}:{UNREAL_PORT}...")
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.settimeout(5)  # 5 second timeout
+            host = self.config.connection_host
+            port = self.config.connection_port
+            timeout = self.config.connection_timeout
             
-            # Set socket options for better stability
+            logger.info(f"Connecting to Unreal at {host}:{port}...")
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.settimeout(timeout)
+            
             self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
             
-            # Set larger buffer sizes
-            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 65536)
-            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 65536)
+            sock_recv = self.config.get("connection.socket_recv_buffer", 65536)
+            sock_send = self.config.get("connection.socket_send_buffer", 65536)
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, sock_recv)
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, sock_send)
             
-            self.socket.connect((UNREAL_HOST, UNREAL_PORT))
+            self.socket.connect((host, port))
             self.connected = True
             logger.info("Connected to Unreal Engine")
             return True
@@ -244,6 +257,12 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[Dict[str, Any]]:
         _unreal_connection = get_unreal_connection()
         if _unreal_connection:
             logger.info("Connected to Unreal Engine on startup")
+            cfg = get_config()
+            if not cfg.detected:
+                if cfg.auto_detect_version(_unreal_connection):
+                    logger.info(f"Engine version auto-detected: UE {cfg.version}")
+                else:
+                    logger.info(f"Using configured version: UE {cfg.version}")
         else:
             logger.warning("Could not connect to Unreal Engine on startup")
     except Exception as e:
@@ -272,12 +291,59 @@ from tools.node_tools import register_blueprint_node_tools
 from tools.project_tools import register_project_tools
 from tools.umg_tools import register_umg_tools
 
-# Register tools
-register_editor_tools(mcp)
-register_blueprint_tools(mcp)
-register_blueprint_node_tools(mcp)
-register_project_tools(mcp)
-register_umg_tools(mcp)  
+# Register tools (pass version config so each module can check feature flags)
+register_editor_tools(mcp, _version_config)
+register_blueprint_tools(mcp, _version_config)
+register_blueprint_node_tools(mcp, _version_config)
+
+if _version_config.has_feature("input_mapping"):
+    register_project_tools(mcp, _version_config)
+else:
+    logger.info("Skipping project tools (not supported in this UE version)")
+
+if _version_config.has_feature("widget_blueprint"):
+    register_umg_tools(mcp, _version_config)
+else:
+    logger.info("Skipping UMG tools (not supported in this UE version)")
+
+@mcp.tool()
+def get_engine_info(ctx: Context) -> Dict[str, Any]:
+    """Get Unreal Engine version and plugin information.
+
+    Returns a dict with engine_version, plugin_version, supported features, etc.
+
+    Example return::
+
+        {
+            "engine_version": "5.5.0",
+            "plugin_version": "1.0",
+            "config_version": "5.5",
+            "features": {"enhanced_input": true, ...}
+        }
+    """
+    from version_config import get_config
+
+    try:
+        unreal = get_unreal_connection()
+        if not unreal:
+            logger.error("Failed to connect to Unreal Engine")
+            return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+        response = unreal.send_command("get_engine_info", {})
+        if not response:
+            logger.error("No response from Unreal Engine")
+            return {"success": False, "message": "No response from Unreal Engine"}
+
+        cfg = get_config()
+        result = response.get("result", response)
+        result["config_version"] = cfg.version
+        result["features"] = cfg.raw.get("features", {})
+        return result
+
+    except Exception as e:
+        logger.error(f"Error getting engine info: {e}")
+        return {"success": False, "message": str(e)}
+
 
 @mcp.prompt()
 def info():
