@@ -56,6 +56,52 @@ Add an input action event node to a Blueprint's event graph.
 }
 ```
 
+### add_blueprint_branch_node
+
+Add a Branch (If Then Else) node to a Blueprint's event graph.
+
+**Parameters:**
+- `blueprint_name` (string) - Name of the target Blueprint
+- `node_position` (array, optional) - [X, Y] position in the graph (default: [0, 0])
+
+**Returns:**
+- Response containing the node ID and success status
+
+**Example:**
+```json
+{
+  "command": "add_blueprint_branch_node",
+  "params": {
+    "blueprint_name": "MyActor",
+    "node_position": [260, 120]
+  }
+}
+```
+
+### add_blueprint_spawn_actor_node
+
+Add a SpawnActorFromClass node to a Blueprint's event graph.
+
+**Parameters:**
+- `blueprint_name` (string) - Name of the target Blueprint
+- `actor_class` (string, optional) - Actor class name to spawn (default: `AActor`)
+- `node_position` (array, optional) - [X, Y] position in the graph (default: [0, 0])
+
+**Returns:**
+- Response containing the node ID and success status
+
+**Example:**
+```json
+{
+  "command": "add_blueprint_spawn_actor_node",
+  "params": {
+    "blueprint_name": "MyActor",
+    "actor_class": "AStaticMeshActor",
+    "node_position": [460, 120]
+  }
+}
+```
+
 ### add_blueprint_function_node
 
 Add a function call node to a Blueprint's event graph.

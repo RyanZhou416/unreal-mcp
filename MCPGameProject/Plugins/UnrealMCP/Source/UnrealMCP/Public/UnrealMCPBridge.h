@@ -45,6 +45,11 @@ public:
 	FString ExecuteCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params);
 
 private:
+	using FCommandHandler = TFunction<TSharedPtr<FJsonObject>(const TSharedPtr<FJsonObject>&)>;
+
+	void BuildCommandRegistry();
+	void RegisterCommand(const FString& CommandType, FCommandHandler Handler);
+
 	// Server state
 	bool bIsRunning;
 	TSharedPtr<FSocket> ListenerSocket;
@@ -61,4 +66,7 @@ private:
 	TSharedPtr<FUnrealMCPBlueprintNodeCommands> BlueprintNodeCommands;
 	TSharedPtr<FUnrealMCPProjectCommands> ProjectCommands;
 	TSharedPtr<FUnrealMCPUMGCommands> UMGCommands;
+
+	// Command routing registry
+	TMap<FString, FCommandHandler> CommandRegistry;
 }; 

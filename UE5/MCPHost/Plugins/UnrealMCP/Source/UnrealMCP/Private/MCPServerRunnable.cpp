@@ -10,6 +10,9 @@
 #include "JsonObjectConverter.h"
 #include "Misc/ScopeLock.h"
 #include "HAL/PlatformTime.h"
+#include "UnrealMCPModule.h"
+
+#define LogTemp LogUnrealMCP
 
 // Buffer size for receiving data
 static constexpr int32 MCPRecvBufferSize = 8192;

@@ -55,7 +55,7 @@
 
 | 节点 | 状态 | Phase | K2Node 类型 / 方式 |
 |------|------|-------|-------------------|
-| Branch (If) | 🔲 | 1 | `K2Node_IfThenElse` |
+| Branch (If) | ✅ | — | `K2Node_IfThenElse` |
 | Sequence | 🔲 | 1 | MacroInstance |
 | ForEachLoop | 🔲 | 1 | MacroInstance |
 | ForEachLoopWithBreak | 🔲 | 1 | MacroInstance |
@@ -77,7 +77,7 @@
 |------|------|-------|------|
 | Call Function | ✅ | — | 通用函数调用 |
 | PrintString | 🔲 | 1 | 通过 CallFunction 调用 KismetSystemLibrary |
-| SpawnActor | 🔲 | 1 | `K2Node_SpawnActorFromClass` |
+| SpawnActor | ✅ | — | `K2Node_SpawnActorFromClass` |
 | DestroyActor | 🔲 | 1 | CallFunction |
 | GetAllActorsOfClass | 🔲 | 1 | CallFunction |
 | SetTimer | 🔲 | 1 | CallFunction (SetTimerByFunctionName) |
@@ -361,12 +361,12 @@
 | 类别 | 已实现 | 计划中 | 总计 | 覆盖率 |
 |------|--------|--------|------|--------|
 | Blueprint 类型 | 2 | 9 | 11 | 18% |
-| K2Node 类型 | 6 | 40+ | 46+ | 13% |
+| K2Node 类型 | 8 | 38+ | 46+ | 17% |
 | UMG Widget | 3 | 23 | 26 | 12% |
 | 组件类型 | 10 | 9 | 19 | 53% |
 | 变量类型 | 5 | 8 | 13 | 38% |
 | 编辑器操作 | 9 | 20+ | 29+ | 31% |
-| **总计** | **35** | **109+** | **144+** | **24%** |
+| **总计** | **37** | **107+** | **144+** | **26%** |
 
 Phase 1 完成后预计覆盖率提升至 **55%**。
 Phase 2 完成后预计覆盖率提升至 **75%**。

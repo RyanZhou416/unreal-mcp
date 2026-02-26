@@ -26,6 +26,19 @@
 #include "Kismet2/KismetEditorUtilities.h"
 #include "K2Node_Event.h"
 
+namespace
+{
+	bool TryGetBlueprintNameCompat(const TSharedPtr<FJsonObject>& Params, FString& OutBlueprintName)
+	{
+		if (Params->TryGetStringField(TEXT("blueprint_name"), OutBlueprintName))
+		{
+			return true;
+		}
+		return Params->TryGetStringField(TEXT("widget_name"), OutBlueprintName) ||
+		       Params->TryGetStringField(TEXT("name"), OutBlueprintName);
+	}
+}
+
 FUnrealMCPUMGCommands::FUnrealMCPUMGCommands()
 {
 }
@@ -64,9 +77,9 @@ TSharedPtr<FJsonObject> FUnrealMCPUMGCommands::HandleCreateUMGWidgetBlueprint(co
 {
 	// Get required parameters
 	FString BlueprintName;
-	if (!Params->TryGetStringField(TEXT("name"), BlueprintName))
+	if (!TryGetBlueprintNameCompat(Params, BlueprintName))
 	{
-		return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
+		return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
 	}
 
 	// Create the full asset path
@@ -121,7 +134,8 @@ TSharedPtr<FJsonObject> FUnrealMCPUMGCommands::HandleCreateUMGWidgetBlueprint(co
 
 	// Create success response
 	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
-	ResultObj->SetStringField(TEXT("name"), BlueprintName);
+	ResultObj->SetStringField(TEXT("blueprint_name"), BlueprintName);
+	ResultObj->SetStringField(TEXT("name"), BlueprintName); // legacy compatibility
 	ResultObj->SetStringField(TEXT("path"), FullPath);
 	return ResultObj;
 }
@@ -130,15 +144,16 @@ TSharedPtr<FJsonObject> FUnrealMCPUMGCommands::HandleAddTextBlockToWidget(const 
 {
 	// Get required parameters
 	FString BlueprintName;
-	if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+	if (!TryGetBlueprintNameCompat(Params, BlueprintName))
 	{
 		return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
 	}
 
-	FString WidgetName;
-	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	FString WidgetName; // TextBlock widget name
+	if (!Params->TryGetStringField(TEXT("text_block_name"), WidgetName) &&
+	    !Params->TryGetStringField(TEXT("widget_name"), WidgetName))
 	{
-		return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+		return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'text_block_name' parameter"));
 	}
 
 	// Find the Widget Blueprint
@@ -190,7 +205,8 @@ TSharedPtr<FJsonObject> FUnrealMCPUMGCommands::HandleAddTextBlockToWidget(const 
 
 	// Create success response
 	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
-	ResultObj->SetStringField(TEXT("widget_name"), WidgetName);
+	ResultObj->SetStringField(TEXT("text_block_name"), WidgetName);
+	ResultObj->SetStringField(TEXT("widget_name"), WidgetName); // legacy compatibility
 	ResultObj->SetStringField(TEXT("text"), InitialText);
 	return ResultObj;
 }
@@ -199,7 +215,7 @@ TSharedPtr<FJsonObject> FUnrealMCPUMGCommands::HandleAddWidgetToViewport(const T
 {
 	// Get required parameters
 	FString BlueprintName;
-	if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+	if (!TryGetBlueprintNameCompat(Params, BlueprintName))
 	{
 		return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
 	}
@@ -230,6 +246,7 @@ TSharedPtr<FJsonObject> FUnrealMCPUMGCommands::HandleAddWidgetToViewport(const T
 	// Create success response with instructions
 	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
 	ResultObj->SetStringField(TEXT("blueprint_name"), BlueprintName);
+	ResultObj->SetStringField(TEXT("widget_name"), BlueprintName); // legacy compatibility
 	ResultObj->SetStringField(TEXT("class_path"), WidgetClass->GetPathName());
 	ResultObj->SetNumberField(TEXT("z_order"), ZOrder);
 	ResultObj->SetStringField(TEXT("note"), TEXT("Widget class ready. Use CreateWidget and AddToViewport nodes in Blueprint to display in game."));
@@ -242,16 +259,17 @@ TSharedPtr<FJsonObject> FUnrealMCPUMGCommands::HandleAddButtonToWidget(const TSh
 
 	// Get required parameters
 	FString BlueprintName;
-	if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+	if (!TryGetBlueprintNameCompat(Params, BlueprintName))
 	{
 		Response->SetStringField(TEXT("error"), TEXT("Missing blueprint_name parameter"));
 		return Response;
 	}
 
-	FString WidgetName;
-	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	FString WidgetName; // Button widget name
+	if (!Params->TryGetStringField(TEXT("button_name"), WidgetName) &&
+	    !Params->TryGetStringField(TEXT("widget_name"), WidgetName))
 	{
-		Response->SetStringField(TEXT("error"), TEXT("Missing widget_name parameter"));
+		Response->SetStringField(TEXT("error"), TEXT("Missing button_name parameter"));
 		return Response;
 	}
 
@@ -315,7 +333,8 @@ TSharedPtr<FJsonObject> FUnrealMCPUMGCommands::HandleAddButtonToWidget(const TSh
 	UEditorAssetLibrary::SaveAsset(BlueprintPath, false);
 
 	Response->SetBoolField(TEXT("success"), true);
-	Response->SetStringField(TEXT("widget_name"), WidgetName);
+	Response->SetStringField(TEXT("button_name"), WidgetName);
+	Response->SetStringField(TEXT("widget_name"), WidgetName); // legacy compatibility
 	return Response;
 }
 
@@ -325,16 +344,17 @@ TSharedPtr<FJsonObject> FUnrealMCPUMGCommands::HandleBindWidgetEvent(const TShar
 
 	// Get required parameters
 	FString BlueprintName;
-	if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+	if (!TryGetBlueprintNameCompat(Params, BlueprintName))
 	{
 		Response->SetStringField(TEXT("error"), TEXT("Missing blueprint_name parameter"));
 		return Response;
 	}
 
-	FString WidgetName;
-	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	FString WidgetName; // Target component/widget name in blueprint
+	if (!Params->TryGetStringField(TEXT("widget_component_name"), WidgetName) &&
+	    !Params->TryGetStringField(TEXT("widget_name"), WidgetName))
 	{
-		Response->SetStringField(TEXT("error"), TEXT("Missing widget_name parameter"));
+		Response->SetStringField(TEXT("error"), TEXT("Missing widget_component_name parameter"));
 		return Response;
 	}
 
@@ -447,21 +467,23 @@ TSharedPtr<FJsonObject> FUnrealMCPUMGCommands::HandleSetTextBlockBinding(const T
 
 	// Get required parameters
 	FString BlueprintName;
-	if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+	if (!TryGetBlueprintNameCompat(Params, BlueprintName))
 	{
 		Response->SetStringField(TEXT("error"), TEXT("Missing blueprint_name parameter"));
 		return Response;
 	}
 
-	FString WidgetName;
-	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	FString WidgetName; // TextBlock widget name
+	if (!Params->TryGetStringField(TEXT("text_block_name"), WidgetName) &&
+	    !Params->TryGetStringField(TEXT("widget_name"), WidgetName))
 	{
-		Response->SetStringField(TEXT("error"), TEXT("Missing widget_name parameter"));
+		Response->SetStringField(TEXT("error"), TEXT("Missing text_block_name parameter"));
 		return Response;
 	}
 
 	FString BindingName;
-	if (!Params->TryGetStringField(TEXT("binding_name"), BindingName))
+	if (!Params->TryGetStringField(TEXT("binding_name"), BindingName) &&
+	    !Params->TryGetStringField(TEXT("binding_property"), BindingName))
 	{
 		Response->SetStringField(TEXT("error"), TEXT("Missing binding_name parameter"));
 		return Response;

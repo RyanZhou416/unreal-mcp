@@ -93,6 +93,21 @@ class TestBlueprintNodes:
             "is_exposed": False,
         })
 
+    def test_add_branch_node(self, ue_client):
+        result = ue_client.ok("add_blueprint_branch_node", {
+            "blueprint_name": self.bp_name,
+            "node_position": [240, 80],
+        })
+        assert "node_id" in result
+
+    def test_add_spawn_actor_node(self, ue_client):
+        result = ue_client.ok("add_blueprint_spawn_actor_node", {
+            "blueprint_name": self.bp_name,
+            "actor_class": "AActor",
+            "node_position": [420, 80],
+        })
+        assert "node_id" in result
+
     def test_find_event_nodes(self, ue_client):
         ue_client.ok("add_blueprint_event_node", {
             "blueprint_name": self.bp_name,

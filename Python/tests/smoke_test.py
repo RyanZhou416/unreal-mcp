@@ -91,6 +91,12 @@ def run(client: UnrealTestClient) -> bool:
     t.check("add_event_node", lambda: client.ok("add_blueprint_event_node", {
         "blueprint_name": bp, "event_name": "ReceiveBeginPlay", "node_position": [0, 0],
     }))
+    t.check("add_branch_node", lambda: client.ok("add_blueprint_branch_node", {
+        "blueprint_name": bp, "node_position": [220, 0],
+    }))
+    t.check("add_spawn_actor_node", lambda: client.ok("add_blueprint_spawn_actor_node", {
+        "blueprint_name": bp, "actor_class": "AActor", "node_position": [420, 0],
+    }))
     t.check("find_nodes", lambda: client.ok("find_blueprint_nodes", {
         "blueprint_name": bp, "node_type": "Event", "event_name": "ReceiveBeginPlay",
     }))

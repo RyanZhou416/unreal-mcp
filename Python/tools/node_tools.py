@@ -118,6 +118,103 @@ def register_blueprint_node_tools(mcp: FastMCP, config=None):
             error_msg = f"Error adding input action node: {e}"
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def add_blueprint_branch_node(
+        ctx: Context,
+        blueprint_name: str,
+        node_position = None
+    ) -> Dict[str, Any]:
+        """
+        Add a Branch (If Then Else) node to a Blueprint's event graph.
+
+        Args:
+            blueprint_name: Name of the target Blueprint
+            node_position: Optional [X, Y] position in the graph
+
+        Returns:
+            Response containing the node ID and success status
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            if node_position is None:
+                node_position = [0, 0]
+
+            params = {
+                "blueprint_name": blueprint_name,
+                "node_position": node_position
+            }
+
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            logger.info(f"Adding Branch node to blueprint '{blueprint_name}'")
+            response = unreal.send_command("add_blueprint_branch_node", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Branch node creation response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error adding branch node: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def add_blueprint_spawn_actor_node(
+        ctx: Context,
+        blueprint_name: str,
+        actor_class: str = "AActor",
+        node_position = None
+    ) -> Dict[str, Any]:
+        """
+        Add a SpawnActorFromClass node to a Blueprint's event graph.
+
+        Args:
+            blueprint_name: Name of the target Blueprint
+            actor_class: Actor class name to spawn (default: AActor)
+            node_position: Optional [X, Y] position in the graph
+
+        Returns:
+            Response containing the node ID and success status
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            if node_position is None:
+                node_position = [0, 0]
+
+            params = {
+                "blueprint_name": blueprint_name,
+                "actor_class": actor_class,
+                "node_position": node_position
+            }
+
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            logger.info(f"Adding SpawnActor node to blueprint '{blueprint_name}' with class '{actor_class}'")
+            response = unreal.send_command("add_blueprint_spawn_actor_node", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"SpawnActor node creation response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error adding spawn actor node: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
     
     @mcp.tool()
     def add_blueprint_function_node(

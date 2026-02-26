@@ -24,7 +24,7 @@ public:
 private:
     /**
      * Create a new UMG Widget Blueprint
-     * @param Params - Must include "name" for the blueprint name
+     * @param Params - Must include "blueprint_name" (legacy aliases: "name", "widget_name")
      * @return JSON response with the created blueprint details
      */
     TSharedPtr<FJsonObject> HandleCreateUMGWidgetBlueprint(const TSharedPtr<FJsonObject>& Params);
@@ -33,7 +33,7 @@ private:
      * Add a Text Block widget to a UMG Widget Blueprint
      * @param Params - Must include:
      *                "blueprint_name" - Name of the target Widget Blueprint
-     *                "widget_name" - Name for the new Text Block
+     *                "text_block_name" - Name for the new Text Block (legacy alias: "widget_name")
      *                "text" - Initial text content (optional)
      *                "position" - [X, Y] position in the canvas (optional)
      * @return JSON response with the added widget details
@@ -53,7 +53,7 @@ private:
      * Add a Button widget to a UMG Widget Blueprint
      * @param Params - Must include:
      *                "blueprint_name" - Name of the target Widget Blueprint
-     *                "widget_name" - Name for the new Button
+     *                "button_name" - Name for the new Button (legacy alias: "widget_name")
      *                "text" - Button text
      *                "position" - [X, Y] position in the canvas
      * @return JSON response with the added widget details
@@ -64,7 +64,7 @@ private:
      * Bind an event to a widget (e.g. button click)
      * @param Params - Must include:
      *                "blueprint_name" - Name of the target Widget Blueprint
-     *                "widget_name" - Name of the widget to bind
+     *                "widget_component_name" - Name of the widget to bind (legacy alias: "widget_name")
      *                "event_name" - Name of the event to bind
      * @return JSON response with the binding details
      */
@@ -74,8 +74,8 @@ private:
      * Set up text block binding for dynamic updates
      * @param Params - Must include:
      *                "blueprint_name" - Name of the target Widget Blueprint
-     *                "widget_name" - Name of the widget to bind
-     *                "binding_name" - Name of the binding to set up
+     *                "text_block_name" - Name of the widget to bind (legacy alias: "widget_name")
+     *                "binding_name" - Name of the binding to set up (legacy alias: "binding_property")
      * @return JSON response with the binding details
      */
     TSharedPtr<FJsonObject> HandleSetTextBlockBinding(const TSharedPtr<FJsonObject>& Params);

@@ -20,6 +20,9 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
+#include "UnrealMCPModule.h"
+
+#define LogTemp LogUnrealMCP
 
 FUnrealMCPBlueprintCommands::FUnrealMCPBlueprintCommands()
 {

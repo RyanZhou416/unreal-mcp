@@ -389,8 +389,10 @@ def info():
     - `spawn_blueprint_actor(blueprint_name, actor_name)` - Spawn Blueprint actors
     
     ## Blueprint Node Management
-    - `add_blueprint_event_node(blueprint_name, event_type)` - Add event nodes
+    - `add_blueprint_event_node(blueprint_name, event_name)` - Add event nodes
     - `add_blueprint_input_action_node(blueprint_name, action_name)` - Add input nodes
+    - `add_blueprint_branch_node(blueprint_name)` - Add Branch (If Then Else) node
+    - `add_blueprint_spawn_actor_node(blueprint_name, actor_class="AActor")` - Add SpawnActor node
     - `add_blueprint_function_node(blueprint_name, target, function_name)` - Add function nodes
     - `connect_blueprint_nodes(blueprint_name, source_node_id, source_pin, target_node_id, target_pin)` - Connect nodes
     - `add_blueprint_variable(blueprint_name, variable_name, variable_type)` - Add variables

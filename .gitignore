@@ -37,6 +37,8 @@ DerivedDataCache/
 Intermediate/
 Saved/
 Content/StarterContent/
+*.dmp
+CrashReportClient/
 
 # Visual Studio files
 .vs/

@@ -10,15 +10,21 @@
 #include "K2Node_VariableGet.h"
 #include "K2Node_InputAction.h"
 #include "K2Node_Self.h"
+#include "K2Node_IfThenElse.h"
+#include "K2Node_SpawnActorFromClass.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "GameFramework/InputSettings.h"
 #include "Camera/CameraActor.h"
 #include "Kismet/GameplayStatics.h"
 #include "EdGraphSchema_K2.h"
+#include "UnrealMCPModule.h"
+#include "Engine/StaticMeshActor.h"
+#include "Engine/PointLight.h"
+#include "Engine/SpotLight.h"
+#include "Engine/DirectionalLight.h"
 
-// Declare the log category
-DEFINE_LOG_CATEGORY_STATIC(LogUnrealMCP, Log, All);
+#define LogTemp LogUnrealMCP
 
 FUnrealMCPBlueprintNodeCommands::FUnrealMCPBlueprintNodeCommands()
 {
@@ -49,6 +55,14 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleCommand(const FSt
     else if (CommandType == TEXT("add_blueprint_input_action_node"))
     {
         return HandleAddBlueprintInputActionNode(Params);
+    }
+    else if (CommandType == TEXT("add_blueprint_branch_node"))
+    {
+        return HandleAddBlueprintBranchNode(Params);
+    }
+    else if (CommandType == TEXT("add_blueprint_spawn_actor_node"))
+    {
+        return HandleAddBlueprintSpawnActorNode(Params);
     }
     else if (CommandType == TEXT("add_blueprint_self_reference"))
     {
@@ -310,7 +324,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintFunct
     UK2Node_CallFunction* FunctionNode = nullptr;
     
     // Add extensive logging for debugging
-    UE_LOG(LogTemp, Display, TEXT("Looking for function '%s' in target '%s'"), 
+    UE_LOG(LogTemp, Verbose, TEXT("Looking for function '%s' in target '%s'"), 
            *FunctionName, Target.IsEmpty() ? TEXT("Blueprint") : *Target);
     
     // Check if we have a target class specified
@@ -321,7 +335,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintFunct
         
         // First try without a prefix
         TargetClass = FindFirstObject<UClass>(*Target, EFindFirstObjectOptions::EnsureIfAmbiguous);
-        UE_LOG(LogTemp, Display, TEXT("Tried to find class '%s': %s"), 
+        UE_LOG(LogTemp, Verbose, TEXT("Tried to find class '%s': %s"), 
                *Target, TargetClass ? TEXT("Found") : TEXT("Not found"));
         
         // If not found, try with U prefix (common convention for UE classes)
@@ -329,7 +343,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintFunct
         {
             FString TargetWithPrefix = FString(TEXT("U")) + Target;
             TargetClass = FindFirstObject<UClass>(*TargetWithPrefix, EFindFirstObjectOptions::EnsureIfAmbiguous);
-            UE_LOG(LogTemp, Display, TEXT("Tried to find class '%s': %s"), 
+            UE_LOG(LogTemp, Verbose, TEXT("Tried to find class '%s': %s"), 
                    *TargetWithPrefix, TargetClass ? TEXT("Found") : TEXT("Not found"));
         }
         
@@ -345,7 +359,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintFunct
                 TargetClass = FindFirstObject<UClass>(*ClassName, EFindFirstObjectOptions::EnsureIfAmbiguous);
                 if (TargetClass)
                 {
-                    UE_LOG(LogTemp, Display, TEXT("Found class using alternative name '%s'"), *ClassName);
+                    UE_LOG(LogTemp, Verbose, TEXT("Found class using alternative name '%s'"), *ClassName);
                     break;
                 }
             }
@@ -359,7 +373,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintFunct
             {
                 // Try loading it from its known package
                 TargetClass = LoadObject<UClass>(nullptr, TEXT("/Script/Engine.GameplayStatics"));
-                UE_LOG(LogTemp, Display, TEXT("Explicitly loading GameplayStatics: %s"), 
+                UE_LOG(LogTemp, Verbose, TEXT("Explicitly loading GameplayStatics: %s"), 
                        TargetClass ? TEXT("Success") : TEXT("Failed"));
             }
         }
@@ -367,7 +381,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintFunct
         // If we found a target class, look for the function there
         if (TargetClass)
         {
-            UE_LOG(LogTemp, Display, TEXT("Looking for function '%s' in class '%s'"), 
+            UE_LOG(LogTemp, Verbose, TEXT("Looking for function '%s' in class '%s'"), 
                    *FunctionName, *TargetClass->GetName());
                    
             // First try exact name
@@ -377,7 +391,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintFunct
             UClass* CurrentClass = TargetClass;
             while (!Function && CurrentClass)
             {
-                UE_LOG(LogTemp, Display, TEXT("Searching in class: %s"), *CurrentClass->GetName());
+                UE_LOG(LogTemp, Verbose, TEXT("Searching in class: %s"), *CurrentClass->GetName());
                 
                 // Try exact match
                 Function = CurrentClass->FindFunctionByName(*FunctionName);
@@ -388,11 +402,11 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintFunct
                     for (TFieldIterator<UFunction> FuncIt(CurrentClass); FuncIt; ++FuncIt)
                     {
                         UFunction* AvailableFunc = *FuncIt;
-                        UE_LOG(LogTemp, Display, TEXT("  - Available function: %s"), *AvailableFunc->GetName());
+                        UE_LOG(LogTemp, Verbose, TEXT("  - Available function: %s"), *AvailableFunc->GetName());
                         
                         if (AvailableFunc->GetName().Equals(FunctionName, ESearchCase::IgnoreCase))
                         {
-                            UE_LOG(LogTemp, Display, TEXT("  - Found case-insensitive match: %s"), *AvailableFunc->GetName());
+                            UE_LOG(LogTemp, Verbose, TEXT("  - Found case-insensitive match: %s"), *AvailableFunc->GetName());
                             Function = AvailableFunc;
                             break;
                         }
@@ -409,7 +423,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintFunct
                 if (TargetClass->GetName() == TEXT("GameplayStatics") && 
                     (FunctionName == TEXT("GetActorOfClass") || FunctionName.Equals(TEXT("GetActorOfClass"), ESearchCase::IgnoreCase)))
                 {
-                    UE_LOG(LogTemp, Display, TEXT("Using special case handling for GameplayStatics::GetActorOfClass"));
+                    UE_LOG(LogTemp, Verbose, TEXT("Using special case handling for GameplayStatics::GetActorOfClass"));
                     
                     // Create the function node directly
                     FunctionNode = NewObject<UK2Node_CallFunction>(EventGraph);
@@ -428,12 +442,12 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintFunct
                         FunctionNode->PostPlacedNewNode();
                         FunctionNode->AllocateDefaultPins();
                         
-                        UE_LOG(LogTemp, Display, TEXT("Created GetActorOfClass node directly"));
+                        UE_LOG(LogTemp, Verbose, TEXT("Created GetActorOfClass node directly"));
                         
                         // List all pins
                         for (UEdGraphPin* Pin : FunctionNode->Pins)
                         {
-                            UE_LOG(LogTemp, Display, TEXT("  - Pin: %s, Direction: %d, Category: %s"), 
+                            UE_LOG(LogTemp, Verbose, TEXT("  - Pin: %s, Direction: %d, Category: %s"), 
                                    *Pin->PinName.ToString(), (int32)Pin->Direction, *Pin->PinType.PinCategory.ToString());
                         }
                     }
@@ -445,7 +459,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintFunct
     // If we still haven't found the function, try in the blueprint's class
     if (!Function && !FunctionNode)
     {
-        UE_LOG(LogTemp, Display, TEXT("Trying to find function in blueprint class"));
+        UE_LOG(LogTemp, Verbose, TEXT("Trying to find function in blueprint class"));
         Function = Blueprint->GeneratedClass->FindFunctionByName(*FunctionName);
     }
     
@@ -476,12 +490,12 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintFunct
                 UEdGraphPin* ParamPin = FUnrealMCPCommonUtils::FindPin(FunctionNode, ParamName, EGPD_Input);
                 if (ParamPin)
                 {
-                    UE_LOG(LogTemp, Display, TEXT("Found parameter pin '%s' of category '%s'"), 
+                    UE_LOG(LogTemp, Verbose, TEXT("Found parameter pin '%s' of category '%s'"), 
                            *ParamName, *ParamPin->PinType.PinCategory.ToString());
-                    UE_LOG(LogTemp, Display, TEXT("  Current default value: '%s'"), *ParamPin->DefaultValue);
+                    UE_LOG(LogTemp, Verbose, TEXT("  Current default value: '%s'"), *ParamPin->DefaultValue);
                     if (ParamPin->PinType.PinSubCategoryObject.IsValid())
                     {
-                        UE_LOG(LogTemp, Display, TEXT("  Pin subcategory: '%s'"), 
+                        UE_LOG(LogTemp, Verbose, TEXT("  Pin subcategory: '%s'"), 
                                *ParamPin->PinType.PinSubCategoryObject->GetName());
                     }
                     
@@ -489,7 +503,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintFunct
                     if (ParamValue->Type == EJson::String)
                     {
                         FString StringVal = ParamValue->AsString();
-                        UE_LOG(LogTemp, Display, TEXT("  Setting string parameter '%s' to: '%s'"), 
+                        UE_LOG(LogTemp, Verbose, TEXT("  Setting string parameter '%s' to: '%s'"), 
                                *ParamName, *StringVal);
                         
                         // Handle class reference parameters (e.g., ActorClass in GetActorOfClass)
@@ -505,7 +519,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintFunct
                             if (!Class)
                             {
                                 Class = LoadObject<UClass>(nullptr, *ClassName);
-                                UE_LOG(LogUnrealMCP, Display, TEXT("FindObject<UClass> failed. Assuming soft path  path: %s"), *ClassName);
+                                UE_LOG(LogUnrealMCP, Verbose, TEXT("FindObject<UClass> failed. Assuming soft path  path: %s"), *ClassName);
                             }
                             
                             // If not found, try with Engine module path
@@ -513,7 +527,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintFunct
                             {
                                 FString EngineClassName = FString::Printf(TEXT("/Script/Engine.%s"), *ClassName);
                                 Class = LoadObject<UClass>(nullptr, *EngineClassName);
-                                UE_LOG(LogUnrealMCP, Display, TEXT("Trying Engine module path: %s"), *EngineClassName);
+                                UE_LOG(LogUnrealMCP, Verbose, TEXT("Trying Engine module path: %s"), *EngineClassName);
                             }
                             
                             if (!Class)
@@ -544,7 +558,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintFunct
                             // Ensure we're using an integer value (no decimal)
                             int32 IntValue = FMath::RoundToInt(ParamValue->AsNumber());
                             ParamPin->DefaultValue = FString::FromInt(IntValue);
-                            UE_LOG(LogTemp, Display, TEXT("  Set integer parameter '%s' to: %d (string: '%s')"), 
+                            UE_LOG(LogTemp, Verbose, TEXT("  Set integer parameter '%s' to: %d (string: '%s')"), 
                                    *ParamName, IntValue, *ParamPin->DefaultValue);
                         }
                         else if (ParamPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Float)
@@ -552,14 +566,14 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintFunct
                             // For other numeric types
                             float FloatValue = ParamValue->AsNumber();
                             ParamPin->DefaultValue = FString::SanitizeFloat(FloatValue);
-                            UE_LOG(LogTemp, Display, TEXT("  Set float parameter '%s' to: %f (string: '%s')"), 
+                            UE_LOG(LogTemp, Verbose, TEXT("  Set float parameter '%s' to: %f (string: '%s')"), 
                                    *ParamName, FloatValue, *ParamPin->DefaultValue);
                         }
                         else if (ParamPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Boolean)
                         {
                             bool BoolValue = ParamValue->AsBool();
                             ParamPin->DefaultValue = BoolValue ? TEXT("true") : TEXT("false");
-                            UE_LOG(LogTemp, Display, TEXT("  Set boolean parameter '%s' to: %s"), 
+                            UE_LOG(LogTemp, Verbose, TEXT("  Set boolean parameter '%s' to: %s"), 
                                    *ParamName, *ParamPin->DefaultValue);
                         }
                         else if (ParamPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Struct && ParamPin->PinType.PinSubCategoryObject == TBaseStructure<FVector>::Get())
@@ -579,9 +593,9 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintFunct
                                     FString VectorString = FString::Printf(TEXT("(X=%f,Y=%f,Z=%f)"), X, Y, Z);
                                     ParamPin->DefaultValue = VectorString;
                                     
-                                    UE_LOG(LogTemp, Display, TEXT("  Set vector parameter '%s' to: %s"), 
+                                    UE_LOG(LogTemp, Verbose, TEXT("  Set vector parameter '%s' to: %s"), 
                                            *ParamName, *VectorString);
-                                    UE_LOG(LogTemp, Display, TEXT("  Final pin value: '%s'"), 
+                                    UE_LOG(LogTemp, Verbose, TEXT("  Final pin value: '%s'"), 
                                            *ParamPin->DefaultValue);
                                 }
                                 else
@@ -599,7 +613,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintFunct
                             // Ensure we're using an integer value (no decimal)
                             int32 IntValue = FMath::RoundToInt(ParamValue->AsNumber());
                             ParamPin->DefaultValue = FString::FromInt(IntValue);
-                            UE_LOG(LogTemp, Display, TEXT("  Set integer parameter '%s' to: %d (string: '%s')"), 
+                            UE_LOG(LogTemp, Verbose, TEXT("  Set integer parameter '%s' to: %d (string: '%s')"), 
                                    *ParamName, IntValue, *ParamPin->DefaultValue);
                         }
                         else
@@ -607,7 +621,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintFunct
                             // For other numeric types
                             float FloatValue = ParamValue->AsNumber();
                             ParamPin->DefaultValue = FString::SanitizeFloat(FloatValue);
-                            UE_LOG(LogTemp, Display, TEXT("  Set float parameter '%s' to: %f (string: '%s')"), 
+                            UE_LOG(LogTemp, Verbose, TEXT("  Set float parameter '%s' to: %f (string: '%s')"), 
                                    *ParamName, FloatValue, *ParamPin->DefaultValue);
                         }
                     }
@@ -615,12 +629,12 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintFunct
                     {
                         bool BoolValue = ParamValue->AsBool();
                         ParamPin->DefaultValue = BoolValue ? TEXT("true") : TEXT("false");
-                        UE_LOG(LogTemp, Display, TEXT("  Set boolean parameter '%s' to: %s"), 
+                        UE_LOG(LogTemp, Verbose, TEXT("  Set boolean parameter '%s' to: %s"), 
                                *ParamName, *ParamPin->DefaultValue);
                     }
                     else if (ParamValue->Type == EJson::Array)
                     {
-                        UE_LOG(LogTemp, Display, TEXT("  Processing array parameter '%s'"), *ParamName);
+                        UE_LOG(LogTemp, Verbose, TEXT("  Processing array parameter '%s'"), *ParamName);
                         // Handle array parameters - like Vector parameters
                         const TArray<TSharedPtr<FJsonValue>>* ArrayValue;
                         if (ParamValue->TryGetArray(ArrayValue))
@@ -638,9 +652,9 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintFunct
                                 FString VectorString = FString::Printf(TEXT("(X=%f,Y=%f,Z=%f)"), X, Y, Z);
                                 ParamPin->DefaultValue = VectorString;
                                 
-                                UE_LOG(LogTemp, Display, TEXT("  Set vector parameter '%s' to: %s"), 
+                                UE_LOG(LogTemp, Verbose, TEXT("  Set vector parameter '%s' to: %s"), 
                                        *ParamName, *VectorString);
-                                UE_LOG(LogTemp, Display, TEXT("  Final pin value: '%s'"), 
+                                UE_LOG(LogTemp, Verbose, TEXT("  Final pin value: '%s'"), 
                                        *ParamPin->DefaultValue);
                             }
                             else
@@ -815,6 +829,157 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintInput
     return ResultObj;
 }
 
+TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintBranchNode(const TSharedPtr<FJsonObject>& Params)
+{
+    FString BlueprintName;
+    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+    }
+
+    FVector2D NodePosition(0.0f, 0.0f);
+    if (Params->HasField(TEXT("node_position")))
+    {
+        NodePosition = FUnrealMCPCommonUtils::GetVector2DFromJson(Params, TEXT("node_position"));
+    }
+
+    UBlueprint* Blueprint = FUnrealMCPCommonUtils::FindBlueprint(BlueprintName);
+    if (!Blueprint)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
+    }
+
+    UEdGraph* EventGraph = FUnrealMCPCommonUtils::FindOrCreateEventGraph(Blueprint);
+    if (!EventGraph)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Failed to get event graph"));
+    }
+
+    UK2Node_IfThenElse* BranchNode = NewObject<UK2Node_IfThenElse>(EventGraph);
+    if (!BranchNode)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Failed to create branch node"));
+    }
+
+    BranchNode->NodePosX = NodePosition.X;
+    BranchNode->NodePosY = NodePosition.Y;
+    EventGraph->AddNode(BranchNode, true);
+    BranchNode->CreateNewGuid();
+    BranchNode->PostPlacedNewNode();
+    BranchNode->AllocateDefaultPins();
+
+    FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetStringField(TEXT("node_id"), BranchNode->NodeGuid.ToString());
+    ResultObj->SetStringField(TEXT("node_type"), TEXT("Branch"));
+    return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintSpawnActorNode(const TSharedPtr<FJsonObject>& Params)
+{
+    FString BlueprintName;
+    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+    }
+
+    FString ActorClassName = TEXT("AActor");
+    Params->TryGetStringField(TEXT("actor_class"), ActorClassName);
+
+    FVector2D NodePosition(0.0f, 0.0f);
+    if (Params->HasField(TEXT("node_position")))
+    {
+        NodePosition = FUnrealMCPCommonUtils::GetVector2DFromJson(Params, TEXT("node_position"));
+    }
+
+    UBlueprint* Blueprint = FUnrealMCPCommonUtils::FindBlueprint(BlueprintName);
+    if (!Blueprint)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
+    }
+
+    UEdGraph* EventGraph = FUnrealMCPCommonUtils::FindOrCreateEventGraph(Blueprint);
+    if (!EventGraph)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Failed to get event graph"));
+    }
+
+    UK2Node_SpawnActorFromClass* SpawnNode = NewObject<UK2Node_SpawnActorFromClass>(EventGraph);
+    if (!SpawnNode)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Failed to create spawn actor node"));
+    }
+
+    SpawnNode->NodePosX = NodePosition.X;
+    SpawnNode->NodePosY = NodePosition.Y;
+    EventGraph->AddNode(SpawnNode, true);
+    SpawnNode->CreateNewGuid();
+    SpawnNode->AllocateDefaultPins();
+    SpawnNode->PostPlacedNewNode();
+
+    UClass* ActorClass = nullptr;
+    if (ActorClassName == TEXT("AActor") || ActorClassName == TEXT("Actor"))
+    {
+        ActorClass = AActor::StaticClass();
+    }
+    else if (ActorClassName == TEXT("AStaticMeshActor") || ActorClassName == TEXT("StaticMeshActor"))
+    {
+        ActorClass = AStaticMeshActor::StaticClass();
+    }
+    else if (ActorClassName == TEXT("APointLight") || ActorClassName == TEXT("PointLight"))
+    {
+        ActorClass = APointLight::StaticClass();
+    }
+    else if (ActorClassName == TEXT("ASpotLight") || ActorClassName == TEXT("SpotLight"))
+    {
+        ActorClass = ASpotLight::StaticClass();
+    }
+    else if (ActorClassName == TEXT("ADirectionalLight") || ActorClassName == TEXT("DirectionalLight"))
+    {
+        ActorClass = ADirectionalLight::StaticClass();
+    }
+
+    if (!ActorClass)
+    {
+        ActorClass = FindFirstObject<UClass>(*ActorClassName, EFindFirstObjectOptions::EnsureIfAmbiguous);
+    }
+    if (!ActorClass)
+    {
+        ActorClass = LoadObject<UClass>(nullptr, *ActorClassName);
+    }
+    if (!ActorClass)
+    {
+        FString EnginePath = FString::Printf(TEXT("/Script/Engine.%s"), *ActorClassName);
+        ActorClass = LoadObject<UClass>(nullptr, *EnginePath);
+    }
+    if (!ActorClass)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Failed to find actor class: %s"), *ActorClassName));
+    }
+
+    UEdGraphPin* ClassPin = SpawnNode->GetClassPin();
+    if (!ClassPin)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Failed to get class pin for spawn node"));
+    }
+
+    const UEdGraphSchema_K2* K2Schema = Cast<const UEdGraphSchema_K2>(EventGraph->GetSchema());
+    if (!K2Schema)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Failed to get K2 schema"));
+    }
+    K2Schema->TrySetDefaultObject(*ClassPin, ActorClass);
+
+    FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetStringField(TEXT("node_id"), SpawnNode->NodeGuid.ToString());
+    ResultObj->SetStringField(TEXT("node_type"), TEXT("SpawnActor"));
+    ResultObj->SetStringField(TEXT("actor_class"), ActorClass->GetName());
+    return ResultObj;
+}
+
 TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleAddBlueprintSelfReference(const TSharedPtr<FJsonObject>& Params)
 {
     // Get required parameters
@@ -907,7 +1072,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintNodeCommands::HandleFindBlueprintNode
             UK2Node_Event* EventNode = Cast<UK2Node_Event>(Node);
             if (EventNode && EventNode->EventReference.GetMemberName() == FName(*EventName))
             {
-                UE_LOG(LogTemp, Display, TEXT("Found event node with name %s: %s"), *EventName, *EventNode->NodeGuid.ToString());
+                UE_LOG(LogTemp, Verbose, TEXT("Found event node with name %s: %s"), *EventName, *EventNode->NodeGuid.ToString());
                 NodeGuidArray.Add(MakeShared<FJsonValueString>(EventNode->NodeGuid.ToString()));
             }
         }

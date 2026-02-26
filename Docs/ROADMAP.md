@@ -6,17 +6,17 @@
 
 ## 当前状态 (v0.1.0)
 
-已实现 31 个 MCP 工具，覆盖：
+已实现 33 个 MCP 工具，覆盖：
 
 | 模块 | 工具数 | 范围 |
 |------|-------|------|
 | Editor | 9 | Actor CRUD、Transform、属性、视口、截图 |
 | Blueprint 结构 | 7 | 创建 BP、添加组件、设置属性/物理、编译 |
-| Blueprint 节点 | 8 | 6 种 K2Node（Event/CallFunction/InputAction/VariableGet/Self/InputAction） |
+| Blueprint 节点 | 10 | 8 种 K2Node（含 Branch、SpawnActor） |
 | UMG | 6 | Widget Blueprint 创建、TextBlock、Button |
 | 项目 | 1 | InputMapping |
 
-**核心缺失：** 控制流节点、类型转换、SpawnActor、自定义函数、大部分 Widget 类型、资产管理、关卡管理、Animation Blueprint、Level Blueprint。
+**核心缺失：** 控制流节点（除 Branch）、类型转换、自定义函数、大部分 Widget 类型、资产管理、关卡管理、Animation Blueprint、Level Blueprint。
 
 ---
 

@@ -25,11 +25,15 @@
 #include "BlueprintActionDatabase.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
+#include "UnrealMCPModule.h"
+
+#define LogTemp LogUnrealMCP
 
 // JSON Utilities
 TSharedPtr<FJsonObject> FUnrealMCPCommonUtils::CreateErrorResponse(const FString& Message)
 {
     TSharedPtr<FJsonObject> ResponseObject = MakeShared<FJsonObject>();
+    ResponseObject->SetStringField(TEXT("status"), TEXT("error"));
     ResponseObject->SetBoolField(TEXT("success"), false);
     ResponseObject->SetStringField(TEXT("error"), Message);
     return ResponseObject;
@@ -38,10 +42,12 @@ TSharedPtr<FJsonObject> FUnrealMCPCommonUtils::CreateErrorResponse(const FString
 TSharedPtr<FJsonObject> FUnrealMCPCommonUtils::CreateSuccessResponse(const TSharedPtr<FJsonObject>& Data)
 {
     TSharedPtr<FJsonObject> ResponseObject = MakeShared<FJsonObject>();
+    ResponseObject->SetStringField(TEXT("status"), TEXT("success"));
     ResponseObject->SetBoolField(TEXT("success"), true);
     
     if (Data.IsValid())
     {
+        ResponseObject->SetObjectField(TEXT("result"), Data);
         ResponseObject->SetObjectField(TEXT("data"), Data);
     }
     

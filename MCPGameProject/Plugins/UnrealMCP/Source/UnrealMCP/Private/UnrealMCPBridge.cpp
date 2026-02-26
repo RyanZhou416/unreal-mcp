@@ -57,10 +57,75 @@
 #include "Commands/UnrealMCPProjectCommands.h"
 #include "Commands/UnrealMCPCommonUtils.h"
 #include "Commands/UnrealMCPUMGCommands.h"
+#include "UnrealMCPModule.h"
+
+#define LogTemp LogUnrealMCP
 
 // Default settings
 #define MCP_SERVER_HOST "127.0.0.1"
 #define MCP_SERVER_PORT 55557
+
+namespace
+{
+    bool IsCommandSuccessful(const TSharedPtr<FJsonObject>& ResultJson, FString& OutErrorMessage)
+    {
+        OutErrorMessage.Empty();
+
+        if (!ResultJson.IsValid())
+        {
+            OutErrorMessage = TEXT("Command returned invalid JSON object");
+            return false;
+        }
+
+        if (ResultJson->HasTypedField<EJson::String>(TEXT("status")))
+        {
+            const FString Status = ResultJson->GetStringField(TEXT("status"));
+            if (Status.Equals(TEXT("error"), ESearchCase::IgnoreCase))
+            {
+                OutErrorMessage = ResultJson->GetStringField(TEXT("error"));
+                return false;
+            }
+            return true;
+        }
+
+        if (ResultJson->HasTypedField<EJson::Boolean>(TEXT("success")))
+        {
+            const bool bSuccess = ResultJson->GetBoolField(TEXT("success"));
+            if (!bSuccess)
+            {
+                OutErrorMessage = ResultJson->GetStringField(TEXT("error"));
+            }
+            return bSuccess;
+        }
+
+        if (ResultJson->HasTypedField<EJson::String>(TEXT("error")))
+        {
+            OutErrorMessage = ResultJson->GetStringField(TEXT("error"));
+            return false;
+        }
+
+        return true;
+    }
+
+    TSharedPtr<FJsonObject> ExtractNormalizedResult(const TSharedPtr<FJsonObject>& ResultJson)
+    {
+        if (!ResultJson.IsValid())
+        {
+            return MakeShared<FJsonObject>();
+        }
+
+        if (ResultJson->HasTypedField<EJson::Object>(TEXT("result")))
+        {
+            return ResultJson->GetObjectField(TEXT("result"));
+        }
+
+        TSharedPtr<FJsonObject> Normalized = MakeShared<FJsonObject>(*ResultJson);
+        Normalized->RemoveField(TEXT("status"));
+        Normalized->RemoveField(TEXT("success"));
+        Normalized->RemoveField(TEXT("error"));
+        return Normalized;
+    }
+}
 
 UUnrealMCPBridge::UUnrealMCPBridge()
 {
@@ -69,15 +134,83 @@ UUnrealMCPBridge::UUnrealMCPBridge()
     BlueprintNodeCommands = MakeShared<FUnrealMCPBlueprintNodeCommands>();
     ProjectCommands = MakeShared<FUnrealMCPProjectCommands>();
     UMGCommands = MakeShared<FUnrealMCPUMGCommands>();
+    BuildCommandRegistry();
 }
 
 UUnrealMCPBridge::~UUnrealMCPBridge()
 {
+    CommandRegistry.Empty();
     EditorCommands.Reset();
     BlueprintCommands.Reset();
     BlueprintNodeCommands.Reset();
     ProjectCommands.Reset();
     UMGCommands.Reset();
+}
+
+void UUnrealMCPBridge::RegisterCommand(const FString& CommandType, FCommandHandler Handler)
+{
+    CommandRegistry.Add(CommandType, MoveTemp(Handler));
+}
+
+void UUnrealMCPBridge::BuildCommandRegistry()
+{
+    CommandRegistry.Empty();
+
+    RegisterCommand(TEXT("ping"), [](const TSharedPtr<FJsonObject>&)
+    {
+        TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
+        Result->SetStringField(TEXT("message"), TEXT("pong"));
+        return Result;
+    });
+
+    // Editor commands
+    RegisterCommand(TEXT("get_actors_in_level"), [this](const TSharedPtr<FJsonObject>& Params) { return EditorCommands->HandleCommand(TEXT("get_actors_in_level"), Params); });
+    RegisterCommand(TEXT("find_actors_by_name"), [this](const TSharedPtr<FJsonObject>& Params) { return EditorCommands->HandleCommand(TEXT("find_actors_by_name"), Params); });
+    RegisterCommand(TEXT("spawn_actor"), [this](const TSharedPtr<FJsonObject>& Params) { return EditorCommands->HandleCommand(TEXT("spawn_actor"), Params); });
+    RegisterCommand(TEXT("create_actor"), [this](const TSharedPtr<FJsonObject>& Params) { return EditorCommands->HandleCommand(TEXT("create_actor"), Params); });
+    RegisterCommand(TEXT("delete_actor"), [this](const TSharedPtr<FJsonObject>& Params) { return EditorCommands->HandleCommand(TEXT("delete_actor"), Params); });
+    RegisterCommand(TEXT("set_actor_transform"), [this](const TSharedPtr<FJsonObject>& Params) { return EditorCommands->HandleCommand(TEXT("set_actor_transform"), Params); });
+    RegisterCommand(TEXT("get_actor_properties"), [this](const TSharedPtr<FJsonObject>& Params) { return EditorCommands->HandleCommand(TEXT("get_actor_properties"), Params); });
+    RegisterCommand(TEXT("set_actor_property"), [this](const TSharedPtr<FJsonObject>& Params) { return EditorCommands->HandleCommand(TEXT("set_actor_property"), Params); });
+    RegisterCommand(TEXT("spawn_blueprint_actor"), [this](const TSharedPtr<FJsonObject>& Params) { return EditorCommands->HandleCommand(TEXT("spawn_blueprint_actor"), Params); });
+    RegisterCommand(TEXT("focus_viewport"), [this](const TSharedPtr<FJsonObject>& Params) { return EditorCommands->HandleCommand(TEXT("focus_viewport"), Params); });
+    RegisterCommand(TEXT("take_screenshot"), [this](const TSharedPtr<FJsonObject>& Params) { return EditorCommands->HandleCommand(TEXT("take_screenshot"), Params); });
+    RegisterCommand(TEXT("get_engine_info"), [this](const TSharedPtr<FJsonObject>& Params) { return EditorCommands->HandleCommand(TEXT("get_engine_info"), Params); });
+    RegisterCommand(TEXT("delete_asset"), [this](const TSharedPtr<FJsonObject>& Params) { return EditorCommands->HandleCommand(TEXT("delete_asset"), Params); });
+
+    // Blueprint commands
+    RegisterCommand(TEXT("create_blueprint"), [this](const TSharedPtr<FJsonObject>& Params) { return BlueprintCommands->HandleCommand(TEXT("create_blueprint"), Params); });
+    RegisterCommand(TEXT("add_component_to_blueprint"), [this](const TSharedPtr<FJsonObject>& Params) { return BlueprintCommands->HandleCommand(TEXT("add_component_to_blueprint"), Params); });
+    RegisterCommand(TEXT("set_component_property"), [this](const TSharedPtr<FJsonObject>& Params) { return BlueprintCommands->HandleCommand(TEXT("set_component_property"), Params); });
+    RegisterCommand(TEXT("set_physics_properties"), [this](const TSharedPtr<FJsonObject>& Params) { return BlueprintCommands->HandleCommand(TEXT("set_physics_properties"), Params); });
+    RegisterCommand(TEXT("compile_blueprint"), [this](const TSharedPtr<FJsonObject>& Params) { return BlueprintCommands->HandleCommand(TEXT("compile_blueprint"), Params); });
+    RegisterCommand(TEXT("set_blueprint_property"), [this](const TSharedPtr<FJsonObject>& Params) { return BlueprintCommands->HandleCommand(TEXT("set_blueprint_property"), Params); });
+    RegisterCommand(TEXT("set_static_mesh_properties"), [this](const TSharedPtr<FJsonObject>& Params) { return BlueprintCommands->HandleCommand(TEXT("set_static_mesh_properties"), Params); });
+    RegisterCommand(TEXT("set_pawn_properties"), [this](const TSharedPtr<FJsonObject>& Params) { return BlueprintCommands->HandleCommand(TEXT("set_pawn_properties"), Params); });
+
+    // Blueprint node commands
+    RegisterCommand(TEXT("connect_blueprint_nodes"), [this](const TSharedPtr<FJsonObject>& Params) { return BlueprintNodeCommands->HandleCommand(TEXT("connect_blueprint_nodes"), Params); });
+    RegisterCommand(TEXT("add_blueprint_get_self_component_reference"), [this](const TSharedPtr<FJsonObject>& Params) { return BlueprintNodeCommands->HandleCommand(TEXT("add_blueprint_get_self_component_reference"), Params); });
+    RegisterCommand(TEXT("add_blueprint_self_reference"), [this](const TSharedPtr<FJsonObject>& Params) { return BlueprintNodeCommands->HandleCommand(TEXT("add_blueprint_self_reference"), Params); });
+    RegisterCommand(TEXT("find_blueprint_nodes"), [this](const TSharedPtr<FJsonObject>& Params) { return BlueprintNodeCommands->HandleCommand(TEXT("find_blueprint_nodes"), Params); });
+    RegisterCommand(TEXT("add_blueprint_event_node"), [this](const TSharedPtr<FJsonObject>& Params) { return BlueprintNodeCommands->HandleCommand(TEXT("add_blueprint_event_node"), Params); });
+    RegisterCommand(TEXT("add_blueprint_input_action_node"), [this](const TSharedPtr<FJsonObject>& Params) { return BlueprintNodeCommands->HandleCommand(TEXT("add_blueprint_input_action_node"), Params); });
+    RegisterCommand(TEXT("add_blueprint_branch_node"), [this](const TSharedPtr<FJsonObject>& Params) { return BlueprintNodeCommands->HandleCommand(TEXT("add_blueprint_branch_node"), Params); });
+    RegisterCommand(TEXT("add_blueprint_spawn_actor_node"), [this](const TSharedPtr<FJsonObject>& Params) { return BlueprintNodeCommands->HandleCommand(TEXT("add_blueprint_spawn_actor_node"), Params); });
+    RegisterCommand(TEXT("add_blueprint_function_node"), [this](const TSharedPtr<FJsonObject>& Params) { return BlueprintNodeCommands->HandleCommand(TEXT("add_blueprint_function_node"), Params); });
+    RegisterCommand(TEXT("add_blueprint_get_component_node"), [this](const TSharedPtr<FJsonObject>& Params) { return BlueprintNodeCommands->HandleCommand(TEXT("add_blueprint_get_component_node"), Params); });
+    RegisterCommand(TEXT("add_blueprint_variable"), [this](const TSharedPtr<FJsonObject>& Params) { return BlueprintNodeCommands->HandleCommand(TEXT("add_blueprint_variable"), Params); });
+
+    // Project commands
+    RegisterCommand(TEXT("create_input_mapping"), [this](const TSharedPtr<FJsonObject>& Params) { return ProjectCommands->HandleCommand(TEXT("create_input_mapping"), Params); });
+
+    // UMG commands
+    RegisterCommand(TEXT("create_umg_widget_blueprint"), [this](const TSharedPtr<FJsonObject>& Params) { return UMGCommands->HandleCommand(TEXT("create_umg_widget_blueprint"), Params); });
+    RegisterCommand(TEXT("add_text_block_to_widget"), [this](const TSharedPtr<FJsonObject>& Params) { return UMGCommands->HandleCommand(TEXT("add_text_block_to_widget"), Params); });
+    RegisterCommand(TEXT("add_button_to_widget"), [this](const TSharedPtr<FJsonObject>& Params) { return UMGCommands->HandleCommand(TEXT("add_button_to_widget"), Params); });
+    RegisterCommand(TEXT("bind_widget_event"), [this](const TSharedPtr<FJsonObject>& Params) { return UMGCommands->HandleCommand(TEXT("bind_widget_event"), Params); });
+    RegisterCommand(TEXT("set_text_block_binding"), [this](const TSharedPtr<FJsonObject>& Params) { return UMGCommands->HandleCommand(TEXT("set_text_block_binding"), Params); });
+    RegisterCommand(TEXT("add_widget_to_viewport"), [this](const TSharedPtr<FJsonObject>& Params) { return UMGCommands->HandleCommand(TEXT("add_widget_to_viewport"), Params); });
 }
 
 // Initialize subsystem
@@ -216,75 +349,25 @@ FString UUnrealMCPBridge::ExecuteCommand(const FString& CommandType, const TShar
         
         try
         {
-            TSharedPtr<FJsonObject> ResultJson;
-            
-            if (CommandType == TEXT("ping"))
-            {
-                ResultJson = MakeShareable(new FJsonObject);
-                ResultJson->SetStringField(TEXT("message"), TEXT("pong"));
-            }
-            // Editor Commands (including actor manipulation and engine info)
-            else if (CommandType == TEXT("get_actors_in_level") || 
-                     CommandType == TEXT("find_actors_by_name") ||
-                     CommandType == TEXT("spawn_actor") ||
-                     CommandType == TEXT("create_actor") ||
-                     CommandType == TEXT("delete_actor") || 
-                     CommandType == TEXT("set_actor_transform") ||
-                     CommandType == TEXT("get_actor_properties") ||
-                     CommandType == TEXT("set_actor_property") ||
-                     CommandType == TEXT("spawn_blueprint_actor") ||
-                     CommandType == TEXT("focus_viewport") ||
-                     CommandType == TEXT("take_screenshot") ||
-                     CommandType == TEXT("get_engine_info") ||
-                     CommandType == TEXT("delete_asset"))
-            {
-                ResultJson = EditorCommands->HandleCommand(CommandType, Params);
-            }
-            // Blueprint Commands
-            else if (CommandType == TEXT("create_blueprint") || 
-                     CommandType == TEXT("add_component_to_blueprint") || 
-                     CommandType == TEXT("set_component_property") || 
-                     CommandType == TEXT("set_physics_properties") || 
-                     CommandType == TEXT("compile_blueprint") || 
-                     CommandType == TEXT("set_blueprint_property") || 
-                     CommandType == TEXT("set_static_mesh_properties") ||
-                     CommandType == TEXT("set_pawn_properties"))
-            {
-                ResultJson = BlueprintCommands->HandleCommand(CommandType, Params);
-            }
-            // Blueprint Node Commands
-            else if (CommandType == TEXT("connect_blueprint_nodes") || 
-                     CommandType == TEXT("add_blueprint_get_self_component_reference") ||
-                     CommandType == TEXT("add_blueprint_self_reference") ||
-                     CommandType == TEXT("find_blueprint_nodes") ||
-                     CommandType == TEXT("add_blueprint_event_node") ||
-                     CommandType == TEXT("add_blueprint_input_action_node") ||
-                     CommandType == TEXT("add_blueprint_function_node") ||
-                     CommandType == TEXT("add_blueprint_get_component_node") ||
-                     CommandType == TEXT("add_blueprint_variable"))
-            {
-                ResultJson = BlueprintNodeCommands->HandleCommand(CommandType, Params);
-            }
-            // Project Commands
-            else if (CommandType == TEXT("create_input_mapping"))
-            {
-                ResultJson = ProjectCommands->HandleCommand(CommandType, Params);
-            }
-            // UMG Commands
-            else if (CommandType == TEXT("create_umg_widget_blueprint") ||
-                     CommandType == TEXT("add_text_block_to_widget") ||
-                     CommandType == TEXT("add_button_to_widget") ||
-                     CommandType == TEXT("bind_widget_event") ||
-                     CommandType == TEXT("set_text_block_binding") ||
-                     CommandType == TEXT("add_widget_to_viewport"))
-            {
-                ResultJson = UMGCommands->HandleCommand(CommandType, Params);
-            }
-            else
+            const FCommandHandler* Handler = CommandRegistry.Find(CommandType);
+            if (Handler == nullptr)
             {
                 ResponseJson->SetStringField(TEXT("status"), TEXT("error"));
                 ResponseJson->SetStringField(TEXT("error"), FString::Printf(TEXT("Unknown command: %s"), *CommandType));
-                
+
+                FString ResultString;
+                TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&ResultString);
+                FJsonSerializer::Serialize(ResponseJson.ToSharedRef(), Writer);
+                Promise.SetValue(ResultString);
+                return;
+            }
+
+            TSharedPtr<FJsonObject> ResultJson = (*Handler)(Params);
+            if (!ResultJson.IsValid())
+            {
+                ResponseJson->SetStringField(TEXT("status"), TEXT("error"));
+                ResponseJson->SetStringField(TEXT("error"), FString::Printf(TEXT("Command returned invalid result: %s"), *CommandType));
+
                 FString ResultString;
                 TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&ResultString);
                 FJsonSerializer::Serialize(ResponseJson.ToSharedRef(), Writer);
@@ -292,28 +375,15 @@ FString UUnrealMCPBridge::ExecuteCommand(const FString& CommandType, const TShar
                 return;
             }
             
-            // Check if the result contains an error
-            bool bSuccess = true;
             FString ErrorMessage;
-            
-            if (ResultJson->HasField(TEXT("success")))
+
+            if (IsCommandSuccessful(ResultJson, ErrorMessage))
             {
-                bSuccess = ResultJson->GetBoolField(TEXT("success"));
-                if (!bSuccess && ResultJson->HasField(TEXT("error")))
-                {
-                    ErrorMessage = ResultJson->GetStringField(TEXT("error"));
-                }
-            }
-            
-            if (bSuccess)
-            {
-                // Set success status and include the result
                 ResponseJson->SetStringField(TEXT("status"), TEXT("success"));
-                ResponseJson->SetObjectField(TEXT("result"), ResultJson);
+                ResponseJson->SetObjectField(TEXT("result"), ExtractNormalizedResult(ResultJson));
             }
             else
             {
-                // Set error status and include the error message
                 ResponseJson->SetStringField(TEXT("status"), TEXT("error"));
                 ResponseJson->SetStringField(TEXT("error"), ErrorMessage);
             }
